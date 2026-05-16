@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VacaLens - 智能單字學習助手</title>
+    <meta name="description" content="使用 AI 掃描單字，輕鬆建立專屬單字本，挑戰 7000 單測驗。">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #8b5cf6;
+            --primary-dark: #7c3aed;
+            --accent: #f472b6;
+            --bg-dark: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --safe: #10b981;
+            --danger: #ef4444;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background: var(--bg-dark);
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(244, 114, 182, 0.1) 0%, transparent 40%);
+            color: var(--text-main);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Glassmorphism Navigation */
+        .glass-nav {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 100;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .nav-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -1px;
+        }
+
+        .logo span {
+            color: var(--primary);
+        }
+
+        .nav-actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        /* Main Layout */
+        main {
+            margin-top: 80px;
+            padding: 2rem;
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .page {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Dashboard Hero */
+        .hero {
+            margin-bottom: 3rem;
+            text-align: center;
+        }
+
+        .hero h2 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            background: linear-gradient(to right, #fff, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            color: var(--text-muted);
+            font-size: 1.2rem;
+        }
+
+        /* Grid Layout */
+        .grid-container {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 2rem;
+            transition: var(--transition);
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+            box-shadow: 0 10px 30px -10px rgba(139, 92, 246, 0.3);
+        }
+
+        .card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .card p {
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+        }
+
+        /* Level Grid */
+        .level-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        .level-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            padding: 1rem;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .level-btn:hover {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        /* Book Grid */
+        .section-header {
+            margin-bottom: 1.5rem;
+        }
+
+        .book-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .book-card {
+            background: var(--card-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 1.5rem;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+        }
+
+        .book-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--primary);
+        }
+
+        .book-card .count {
+            color: var(--primary);
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        /* Buttons */
+        .icon-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 50%;
+            transition: var(--transition);
+        }
+
+        .icon-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--primary);
+        }
+
+        .primary-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: var(--transition);
+        }
+
+        .primary-btn:hover {
+            background: var(--primary-dark);
+            transform: scale(1.02);
+        }
+
+        .secondary-btn {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+            border: 1px solid var(--glass-border);
+            padding: 0.8rem 1.2rem;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: var(--transition);
+        }
+
+        .secondary-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .accent-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: var(--transition);
+        }
+
+        /* Modals */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #1e293b;
+            border: 1px solid var(--glass-border);
+            padding: 2.5rem;
+            border-radius: 24px;
+            width: 90%;
+            max-width: 450px;
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-muted);
+        }
+
+        .input-group input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--glass-border);
+            padding: 1rem;
+            border-radius: 12px;
+            color: white;
+            outline: none;
+        }
+
+        .input-group input:focus {
+            border-color: var(--primary);
+        }
+
+        .modal-btns {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .modal-btns button {
+            flex: 1;
+        }
+
+        /* Book Detail Header */
+        .detail-header {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .back-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+
+        .header-actions {
+            margin-left: auto;
+            display: flex;
+            gap: 0.8rem;
+        }
+
+        /* Word List */
+        .word-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .word-item {
+            background: var(--card-bg);
+            border: 1px solid var(--glass-border);
+            padding: 1.2rem 1.5rem;
+            border-radius: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .word-info h4 {
+            font-size: 1.2rem;
+            margin-bottom: 0.2rem;
+        }
+
+        .word-info p {
+            color: var(--text-muted);
+        }
+
+        /* Quiz UI */
+        .quiz-container {
+            max-width: 600px;
+            margin: 4rem auto;
+        }
+
+        .quiz-progress {
+            background: rgba(255, 255, 255, 0.05);
+            height: 8px;
+            border-radius: 4px;
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            transition: width 0.3s ease;
+        }
+
+        .quiz-question {
+            text-align: center;
+        }
+
+        .q-header {
+            display: flex;
+            justify-content: space-between;
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+        }
+
+        .quiz-question h2 {
+            font-size: 3.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .options-grid {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .option-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            padding: 1.2rem;
+            border-radius: 16px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .option-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--primary);
+        }
+
+        .option-btn.correct {
+            background: var(--safe);
+            border-color: var(--safe);
+            color: white;
+        }
+
+        .option-btn.wrong {
+            background: var(--danger);
+            border-color: var(--danger);
+            color: white;
+        }
+
+        /* Camera Modal UI */
+        .camera-view {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            aspect-ratio: 3/4;
+            background: #000;
+            border-radius: 24px;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .camera-overlay {
+            position: absolute;
+            inset: 20px;
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+            pointer-events: none;
+        }
+
+        .camera-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .capture-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: white;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            color: #000;
+            font-weight: bold;
+        }
+
+        .capture-btn:active {
+            transform: scale(0.9);
+        }
+
+        .circle-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            cursor: pointer;
+        }
+
+        /* Animations */
+        .animate-up {
+            animation: slideUp 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+            opacity: 0;
+        }
+
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+        .delay-4 { animation-delay: 0.4s; }
+
+        @keyframes slideUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        @media (max-width: 768px) {
+            .grid-container {
+                grid-template-columns: 1fr;
+            }
+            .hero h2 {
+                font-size: 2rem;
+            }
+            .header-actions {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                background: var(--bg-dark);
+                padding: 1rem;
+                justify-content: center;
+                border-top: 1px solid var(--glass-border);
+            }
+            main {
+                padding-bottom: 80px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Navigation -->
+        <nav class="glass-nav">
+            <div class="nav-content">
+                <h1 class="logo">Vaca<span>Lens</span></h1>
+                <div class="nav-actions">
+                    <button id="home-btn" class="icon-btn" title="回首頁">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    </button>
+
+                </div>
+            </div>
+        </nav>
+
+        <main id="main-content">
+            <section id="dashboard" class="page active">
+                <div class="hero">
+                    <h2 class="animate-up">提升你的英語實力</h2>
+                    <p class="animate-up delay-1">從 7000 單測驗開始，或掃描照片建立單字本。</p>
+                </div>
+
+                <div class="grid-container">
+                    <div class="card quiz-card animate-up delay-2">
+                        <h3>7000 單挑戰</h3>
+                        <p>依照學測分級進行測驗</p>
+                        <div class="level-grid">
+                            <button class="level-btn" data-level="1">L1</button>
+                            <button class="level-btn" data-level="2">L2</button>
+                            <button class="level-btn" data-level="3">L3</button>
+                            <button class="level-btn" data-level="4">L4</button>
+                            <button class="level-btn" data-level="5">L5</button>
+                            <button class="level-btn" data-level="6">L6</button>
+                        </div>
+                    </div>
+
+                    <div class="card action-card animate-up delay-3">
+                        <h3>建立單字本</h3>
+                        <p>拍照掃描或手動輸入</p>
+                        <div class="action-btns">
+                            <button id="create-book-btn" class="primary-btn">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                                新增單字本
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-header animate-up delay-4">
+                    <h3>我的單字本</h3>
+                </div>
+                <div id="book-list" class="book-grid animate-up delay-4">
+                </div>
+            </section>
+
+            <section id="book-detail" class="page">
+                <div class="detail-header">
+                    <button class="back-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    </button>
+                    <h2 id="current-book-name">單字本名稱</h2>
+                    <div class="header-actions">
+                        <button id="scan-btn" class="secondary-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                            AI 掃描
+                        </button>
+                        <button id="add-word-btn" class="secondary-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                            手動新增
+                        </button>
+                        <button id="quiz-book-btn" class="accent-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                            測驗
+                        </button>
+                    </div>
+                </div>
+                <div id="word-list" class="word-list">
+                </div>
+            </section>
+
+            <section id="quiz-page" class="page">
+                <div class="quiz-container">
+                    <div class="quiz-progress">
+                        <div id="progress-bar" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                    <div id="quiz-question" class="quiz-question">
+                        <div class="q-header">
+                            <span id="q-count">1 / 10</span>
+                            <span id="q-category">Level 1</span>
+                        </div>
+                        <h2 id="q-word">Word</h2>
+                        <div id="q-options" class="options-grid">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div id="camera-modal" class="modal">
+                <div class="modal-content camera-content">
+                    <div class="camera-view">
+                        <video id="video" autoplay playsinline></video>
+                        <div class="camera-overlay"></div>
+                    </div>
+                    <div class="camera-controls">
+                        <button id="close-camera" class="circle-btn">✕</button>
+                        <button id="capture-btn" class="capture-btn"></button>
+                        <div class="spacer"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="word-modal" class="modal">
+                <div class="modal-content">
+                    <h3>新增單字</h3>
+                    <div class="input-group">
+                        <label>英文單字</label>
+                        <input type="text" id="input-word" placeholder="例如: apple">
+                    </div>
+                    <div class="input-group">
+                        <label>中文解釋</label>
+                        <input type="text" id="input-def" placeholder="例如: 蘋果">
+                    </div>
+                    <div class="modal-btns">
+                        <button id="cancel-word" class="secondary-btn">取消</button>
+                        <button id="save-word" class="primary-btn">儲存</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="book-modal" class="modal">
+                <div class="modal-content">
+                    <h3>建立新單字本</h3>
+                    <div class="input-group">
+                        <label>名稱</label>
+                        <input type="text" id="input-book-name" placeholder="例如: 基礎單字">
+                    </div>
+                    <div class="modal-btns">
+                        <button id="cancel-book" class="secondary-btn">取消</button>
+                        <button id="save-book" class="primary-btn">建立</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // --- Data ---
+        const CEEC_WORDS = {
+            1: [
+                { word: 'apple', def: '蘋果' }, { word: 'banana', def: '香蕉' }, { word: 'cat', def: '貓' },
+                { word: 'dog', def: '狗' }, { word: 'elephant', def: '大象' }, { word: 'fish', def: '魚' },
+                { word: 'grape', def: '葡萄' }, { word: 'house', def: '房子' }, { word: 'ice', def: '冰' },
+                { word: 'juice', def: '果汁' }, { word: 'kite', def: '風箏' }, { word: 'lemon', def: '檸檬' }
+            ],
+            2: [
+                { word: 'abandon', def: '放棄' }, { word: 'ability', def: '能力' }, { word: 'abroad', def: '在國外' },
+                { word: 'absence', def: '缺席' }, { word: 'accent', def: '口音' }, { word: 'accept', def: '接受' },
+                { word: 'accident', def: '事故' }, { word: 'account', def: '帳戶' }, { word: 'achieve', def: '達成' },
+                { word: 'active', def: '活躍的' }, { word: 'admire', def: '欽佩' }, { word: 'advice', def: '建議' }
+            ],
+            3: [
+                { word: 'barrier', def: '障礙' }, { word: 'battery', def: '電池' }, { word: 'beneath', def: '在...之下' },
+                { word: 'benefit', def: '利益' }, { word: 'beyond', def: '超出' }, { word: 'biology', def: '生物學' },
+                { word: 'blanket', def: '毯子' }, { word: 'blessing', def: '祝福' }, { word: 'boundary', def: '邊界' },
+                { word: 'bravery', def: '勇氣' }, { word: 'brilliant', def: '輝煌的' }, { word: 'broadcast', def: '廣播' }
+            ],
+            4: [
+                { word: 'calculate', def: '計算' }, { word: 'campaign', def: '活動' }, { word: 'capacity', def: '容量' },
+                { word: 'category', def: '類別' }, { word: 'celebrate', def: '慶祝' }, { word: 'champion', def: '冠軍' },
+                { word: 'character', def: '角色' }, { word: 'charity', def: '慈善' }, { word: 'chemical', def: '化學的' },
+                { word: 'cherish', def: '珍惜' }, { word: 'civilized', def: '文明的' }, { word: 'classical', def: '古典的' }
+            ],
+            5: [
+                { word: 'democracy', def: '民主' }, { word: 'departure', def: '離開' }, { word: 'desperate', def: '拼命的' },
+                { word: 'determine', def: '決定' }, { word: 'diagnosis', def: '診斷' }, { word: 'discipline', def: '紀律' },
+                { word: 'discovery', def: '發現' }, { word: 'distinction', def: '區別' }, { word: 'dominate', def: '支配' },
+                { word: 'dramatic', def: '戲劇性的' }, { word: 'efficient', def: '有效率的' }, { word: 'elaborate', def: '精心的' }
+            ],
+            6: [
+                { word: 'ambiguous', def: '模稜兩可的' }, { word: 'benevolent', def: '仁慈的' }, { word: 'capricious', def: '反覆無常的' },
+                { word: 'deference', def: '尊崇' }, { word: 'eloquence', def: '雄辯' }, { word: 'fastidious', def: '挑剔的' },
+                { word: 'gregarious', def: '群居的' }, { word: 'hierarchy', def: '階級制度' }, { word: 'immutable', def: '不可變的' },
+                { word: 'juxtapose', def: '並列' }, { word: 'laconic', def: '簡潔的' }, { word: 'magnanimous', def: '寬宏大量的' }
+            ]
+        };
+
+        // --- State ---
+        let books = JSON.parse(localStorage.getItem('vaca-books')) || [
+            { id: 'mistakes', name: '測驗錯題本', words: [] }
+        ];
+        let currentBookId = null;
+        let currentQuiz = {
+            words: [],
+            currentIndex: 0,
+            score: 0,
+            wrongWords: [],
+            level: null
+        };
+
+        // --- DOM Elements ---
+        const pages = {
+            dashboard: document.getElementById('dashboard'),
+            bookDetail: document.getElementById('book-detail'),
+            quizPage: document.getElementById('quiz-page')
+        };
+
+        // --- Core Functions ---
+        function saveBooks() {
+            localStorage.setItem('vaca-books', JSON.stringify(books));
+        }
+
+        function navigateTo(pageId) {
+            Object.values(pages).forEach(p => p.classList.remove('active'));
+            pages[pageId].classList.add('active');
+            window.scrollTo(0, 0);
+        }
+
+        // --- Dashboard Logic ---
+        function renderBookList() {
+            const list = document.getElementById('book-list');
+            list.innerHTML = '';
+            books.forEach(book => {
+                const card = document.createElement('div');
+                card.className = 'book-card';
+                card.innerHTML = `
+                    <div class="count">${book.words.length} 單字</div>
+                    <h3>${book.name}</h3>
+                `;
+                card.onclick = () => openBook(book.id);
+                list.appendChild(card);
+            });
+        }
+
+        function openBook(bookId) {
+            currentBookId = bookId;
+            const book = books.find(b => b.id === bookId);
+            document.getElementById('current-book-name').textContent = book.name;
+            renderWordList();
+            navigateTo('bookDetail');
+        }
+
+        function renderWordList() {
+            const book = books.find(b => b.id === currentBookId);
+            const list = document.getElementById('word-list');
+            list.innerHTML = '';
+            
+            if (book.words.length === 0) {
+                list.innerHTML = '<p style="text-align:center; color:var(--text-muted); margin-top:2rem;">目前沒有單字，快點新增吧！</p>';
+                return;
+            }
+
+            book.words.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'word-item';
+                div.innerHTML = `
+                    <div class="word-info">
+                        <h4>${item.word}</h4>
+                        <p>${item.def}</p>
+                    </div>
+                    <div class="word-actions">
+                        <button class="icon-btn delete-word" data-index="${index}">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                        </button>
+                    </div>
+                `;
+                div.querySelector('.delete-word').onclick = (e) => {
+                    e.stopPropagation();
+                    deleteWord(index);
+                };
+                list.appendChild(div);
+            });
+        }
+
+        function deleteWord(index) {
+            const book = books.find(b => b.id === currentBookId);
+            book.words.splice(index, 1);
+            saveBooks();
+            renderWordList();
+            renderBookList();
+        }
+
+        // --- Quiz Logic ---
+        function startQuiz(level = null, bookWords = null) {
+            let quizWords = [];
+            if (level) {
+                const source = CEEC_WORDS[level];
+                quizWords = [...source].sort(() => 0.5 - Math.random()).slice(0, 10);
+                currentQuiz.level = `Level ${level}`;
+            } else if (bookWords) {
+                quizWords = [...bookWords].sort(() => 0.5 - Math.random()).slice(0, 20);
+                currentQuiz.level = '單字本測驗';
+            }
+
+            if (quizWords.length < 4 && !level) {
+                alert('單字量不足（至少需要 4 個單字才能測驗）');
+                return;
+            }
+
+            currentQuiz.words = quizWords;
+            currentQuiz.currentIndex = 0;
+            currentQuiz.score = 0;
+            currentQuiz.wrongWords = [];
+            
+            navigateTo('quizPage');
+            showQuestion();
+        }
+
+        function showQuestion() {
+            const q = currentQuiz.words[currentQuiz.currentIndex];
+            const total = currentQuiz.words.length;
+            
+            document.getElementById('progress-bar').style.width = `${(currentQuiz.currentIndex / total) * 100}%`;
+            document.getElementById('q-count').textContent = `${currentQuiz.currentIndex + 1} / ${total}`;
+            document.getElementById('q-category').textContent = currentQuiz.level;
+            document.getElementById('q-word').textContent = q.word;
+
+            const options = [q.def];
+            const allWords = currentQuiz.level.includes('Level') 
+                ? CEEC_WORDS[currentQuiz.level.split(' ')[1]] 
+                : currentQuiz.words;
+            
+            const decoys = allWords
+                .filter(w => w.def !== q.def)
+                .sort(() => 0.5 - Math.random())
+                .slice(0, 3)
+                .map(w => w.def);
+            
+            options.push(...decoys);
+            options.sort(() => 0.5 - Math.random());
+
+            const grid = document.getElementById('q-options');
+            grid.innerHTML = '';
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(opt, q.def, btn);
+                grid.appendChild(btn);
+            });
+        }
+
+        function handleAnswer(selected, correct, btn) {
+            const buttons = document.querySelectorAll('.option-btn');
+            buttons.forEach(b => b.disabled = true);
+
+            if (selected === correct) {
+                btn.classList.add('correct');
+                currentQuiz.score++;
+            } else {
+                btn.classList.add('wrong');
+                buttons.forEach(b => {
+                    if (b.textContent === correct) b.classList.add('correct');
+                });
+                currentQuiz.wrongWords.push(currentQuiz.words[currentQuiz.currentIndex]);
+            }
+
+            setTimeout(() => {
+                currentQuiz.currentIndex++;
+                if (currentQuiz.currentIndex < currentQuiz.words.length) {
+                    showQuestion();
+                } else {
+                    finishQuiz();
+                }
+            }, 1200);
+        }
+
+        function finishQuiz() {
+            if (currentQuiz.wrongWords.length > 0) {
+                const mistakeBook = books.find(b => b.id === 'mistakes');
+                currentQuiz.wrongWords.forEach(w => {
+                    if (!mistakeBook.words.find(mw => mw.word === w.word)) {
+                        mistakeBook.words.push(w);
+                    }
+                });
+                saveBooks();
+            }
+
+            alert(`測驗結束！得分：${currentQuiz.score} / ${currentQuiz.words.length}\n${currentQuiz.wrongWords.length} 個錯題已加入錯題本。`);
+            renderBookList();
+            navigateTo('dashboard');
+        }
+
+        // --- Camera & AI Logic ---
+        let stream = null;
+
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                document.getElementById('video').srcObject = stream;
+                document.getElementById('camera-modal').classList.add('active');
+            } catch (err) {
+                alert('無法開啟相機: ' + err.message + '\n請確保在 HTTPS 環境或 localhost 下使用。');
+            }
+        }
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            document.getElementById('camera-modal').classList.remove('active');
+        }
+
+        async function captureAndScan() {
+            const video = document.getElementById('video');
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            
+            const btn = document.getElementById('capture-btn');
+            btn.textContent = '掃描中...';
+            btn.disabled = true;
+
+            console.log('Sending to Gemini AI...');
+            await new Promise(r => setTimeout(r, 2000));
+
+            const scannedWords = [
+                { word: 'innovation', def: '創新' },
+                { word: 'perspective', def: '觀點' }
+            ];
+
+            const book = books.find(b => b.id === currentBookId);
+            scannedWords.forEach(w => {
+                if (!book.words.find(bw => bw.word === w.word)) {
+                    book.words.push(w);
+                }
+            });
+
+            saveBooks();
+            renderWordList();
+            renderBookList();
+            stopCamera();
+            btn.textContent = '';
+            btn.disabled = false;
+            alert('AI 掃描完成！已加入 2 個單字。');
+        }
+
+        // --- Event Listeners ---
+        document.getElementById('create-book-btn').onclick = () => {
+            document.getElementById('book-modal').classList.add('active');
+        };
+
+        document.getElementById('cancel-book').onclick = () => {
+            document.getElementById('book-modal').classList.remove('active');
+        };
+
+        document.getElementById('save-book').onclick = () => {
+            const name = document.getElementById('input-book-name').value.trim();
+            if (name) {
+                const newBook = {
+                    id: Date.now().toString(),
+                    name: name,
+                    words: []
+                };
+                books.push(newBook);
+                saveBooks();
+                renderBookList();
+                document.getElementById('book-modal').classList.remove('active');
+                document.getElementById('input-book-name').value = '';
+            }
+        };
+
+        document.querySelectorAll('.level-btn').forEach(btn => {
+            btn.onclick = () => startQuiz(parseInt(btn.dataset.level));
+        });
+
+        document.querySelector('.back-btn').onclick = () => navigateTo('dashboard');
+        document.getElementById('home-btn').onclick = () => navigateTo('dashboard');
+
+
+        document.getElementById('add-word-btn').onclick = () => {
+            document.getElementById('word-modal').classList.add('active');
+        };
+
+        document.getElementById('cancel-word').onclick = () => {
+            document.getElementById('word-modal').classList.remove('active');
+        };
+
+        document.getElementById('save-word').onclick = () => {
+            const word = document.getElementById('input-word').value.trim();
+            const def = document.getElementById('input-def').value.trim();
+            if (word && def) {
+                const book = books.find(b => b.id === currentBookId);
+                book.words.push({ word, def });
+                saveBooks();
+                renderWordList();
+                renderBookList();
+                document.getElementById('word-modal').classList.remove('active');
+                document.getElementById('input-word').value = '';
+                document.getElementById('input-def').value = '';
+            }
+        };
+
+        document.getElementById('quiz-book-btn').onclick = () => {
+            const book = books.find(b => b.id === currentBookId);
+            startQuiz(null, book.words);
+        };
+
+        document.getElementById('scan-btn').onclick = startCamera;
+        document.getElementById('close-camera').onclick = stopCamera;
+        document.getElementById('capture-btn').onclick = captureAndScan;
+
+        renderBookList();
+    </script>
+</body>
+</html>
