@@ -12,6 +12,9 @@ const multer = require('multer');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// 如果你想讓伺服器端直接呼叫 Gemini API，請在這裡填入你的 API Key：
+const GEMINI_API_KEY = 'AIzaSyBtRqWFSYtkgSFj4wVeu2NAPtB7NcjIDHI'; // <-- 在這裡填入你的 Gemini API Key
+
 app.use(cors({
     origin: true,
     allowedHeaders: ['Content-Type', 'x-user-id'],
@@ -191,8 +194,13 @@ app.post('/api/ocr', auth, upload.single('file'), async (req, res) => {
     const imagePath = req.file.path;
     const pythonCmd = process.platform.startsWith('win') ? 'python' : 'python3';
     const scriptPath = path.join(__dirname, 'ocr.py');
+    const args = [scriptPath, imagePath, '--lang', lang];
 
-    execFile(pythonCmd, [scriptPath, imagePath, '--lang', lang], { cwd: __dirname, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+    if (GEMINI_API_KEY) {
+        args.push('--use-gemini', '--api-key', GEMINI_API_KEY);
+    }
+
+    execFile(pythonCmd, args, { cwd: __dirname, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
         fs.unlink(imagePath, () => {});
         if (error) {
             console.error('OCR failed:', error);
