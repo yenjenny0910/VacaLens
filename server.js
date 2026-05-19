@@ -8,6 +8,15 @@ const fs = require('fs');
 const os = require('os');
 const multer = require('multer');
 
+let fetch = globalThis.fetch;
+try {
+    if (!fetch) {
+        fetch = require('node-fetch');
+    }
+} catch (err) {
+    fetch = globalThis.fetch;
+}
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 const GEMINI_MODEL = 'gemini-2.5-flash';
@@ -223,6 +232,11 @@ app.post('/api/ocr', auth, upload.single('file'), async (req, res) => {
         return res.status(500).json({ error: 'Gemini API key is not configured' });
     }
 
+    if (!fetch) {
+        fs.unlink(imagePath, () => {});
+        return res.status(500).json({ error: 'Fetch is not available on this server environment' });
+    }
+
     try {
         const imageBytes = await fs.promises.readFile(imagePath);
         const base64Image = imageBytes.toString('base64');
@@ -241,7 +255,7 @@ app.post('/api/ocr', auth, upload.single('file'), async (req, res) => {
 
         const useBearer = apiKey.startsWith('ya29.');
         const baseUrl = `https://gemini.googleapis.com/v1/models/${model}:predict`;
-        const fallbackUrl = `https://api.generativeai.google/v1/models/${model}:predict`;
+        const fallbackUrl = `https://generativeai.googleapis.com/v1/models/${model}:predict`;
         const params = useBearer ? '' : `?key=${encodeURIComponent(apiKey)}`;
         const headers = {
             'Content-Type': 'application/json'
