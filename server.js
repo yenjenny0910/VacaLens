@@ -218,17 +218,14 @@ function parseGeminiResponse(data) {
     return '';
 }
 
-const { GoogleGenAI } = require('@google/generative-ai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 app.post('/api/ocr', auth, upload.single('file'), async (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({ error: 'No file uploaded' });
-    }
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
     const imagePath = req.file.path;
     const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-    // 預設使用標準的 gemini-2.5-flash，速度最快且支援圖片
-    const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash'; 
+    const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
     if (!apiKey) {
         fs.unlink(imagePath, () => {});
@@ -236,51 +233,36 @@ app.post('/api/ocr', auth, upload.single('file'), async (req, res) => {
     }
 
     try {
-        // 1. 讀取圖片並轉成 Google 要求的 inlineData 格式
         const imageBytes = await fs.promises.readFile(imagePath);
         const imagePart = {
             inlineData: {
                 data: imageBytes.toString('base64'),
-                mimeType: req.file.mimetype // 動態抓取圖片類型 (如 image/jpeg, image/png)
+                mimeType: req.file.mimetype
             }
         };
 
-        // 2. 初始化 Google Gen AI 官方客戶端
-        const ai = new GoogleGenAI({ apiKey: apiKey });
+        // 核心修正點
+        const ai = new GoogleGenerativeAI(apiKey);
+        const model = ai.getGenerativeModel({ model: modelName });
+        
+        const result = await model.generateContent([
+            imagePart,
+            'Extract the text from this image and return only the recognized text.'
+        ]);
 
-        // 3. 呼叫 API (正確的指令是 generateContent)
-        const response = await ai.models.generateContent({
-            model: modelName,
-            contents: [
-                imagePart,
-                'Extract the text from this image and return only the recognized text.'
-            ],
-            config: {
-                temperature: 0.0,
-                maxOutputTokens: 1024
-            }
-        });
-
-        // 4. 刪除暫存圖片
         fs.unlink(imagePath, () => {});
 
-        // 5. 取得辨識後的文字
-        const text = response.text;
+        const text = result.response.text();
         if (!text) {
             return res.status(500).json({ error: 'Gemini OCR returned no text' });
         }
 
-        // 6. 回傳給前端
         res.json({ text });
 
     } catch (error) {
-        // 確保發生錯誤時，暫存圖片依然會被刪除，避免硬碟爆滿
         fs.unlink(imagePath, () => {});
         console.error('Gemini OCR 發生錯誤:', error);
-        return res.status(500).json({ 
-            error: 'Gemini OCR failed', 
-            details: error.message 
-        });
+        return res.status(500).json({ error: 'Gemini OCR failed', details: error.message });
     }
 });
 app.use(express.static(path.join(__dirname, './')));
