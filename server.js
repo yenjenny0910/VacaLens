@@ -215,7 +215,8 @@ app.post('/api/ocr', auth, upload.single('file'), async (req, res) => {
     }
 
     const imagePath = req.file.path;
-        const apiKey = process.env.API_KEY;
+    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+    const model = process.env.GEMINI_MODEL || GEMINI_MODEL;
 
     if (!apiKey) {
         fs.unlink(imagePath, () => {});
