@@ -218,132 +218,71 @@ function parseGeminiResponse(data) {
     return '';
 }
 
+const { GoogleGenAI } = require('@google/generative-ai');
+
 app.post('/api/ocr', auth, upload.single('file'), async (req, res) => {
     if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
     }
 
     const imagePath = req.file.path;
-    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
-    const model = process.env.GEMINI_MODEL || GEMINI_MODEL;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+    // 預設使用標準的 gemini-2.5-flash，速度最快且支援圖片
+    const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash'; 
 
     if (!apiKey) {
         fs.unlink(imagePath, () => {});
         return res.status(500).json({ error: 'Gemini API key is not configured' });
     }
 
-    if (!fetch) {
-        fs.unlink(imagePath, () => {});
-        return res.status(500).json({ error: 'Fetch is not available on this server environment' });
-    }
-
     try {
+        // 1. 讀取圖片並轉成 Google 要求的 inlineData 格式
         const imageBytes = await fs.promises.readFile(imagePath);
-        const base64Image = imageBytes.toString('base64');
-        const body = {
-            instances: [
-                {
-                    image: { imageBytes: base64Image },
-                    input: 'Extract the text from this image and return only the recognized text.'
-                }
+        const imagePart = {
+            inlineData: {
+                data: imageBytes.toString('base64'),
+                mimeType: req.file.mimetype // 動態抓取圖片類型 (如 image/jpeg, image/png)
+            }
+        };
+
+        // 2. 初始化 Google Gen AI 官方客戶端
+        const ai = new GoogleGenAI({ apiKey: apiKey });
+
+        // 3. 呼叫 API (正確的指令是 generateContent)
+        const response = await ai.models.generateContent({
+            model: modelName,
+            contents: [
+                imagePart,
+                'Extract the text from this image and return only the recognized text.'
             ],
-            parameters: {
+            config: {
                 temperature: 0.0,
                 maxOutputTokens: 1024
             }
-        };
+        });
 
-        const useBearer = apiKey.startsWith('ya29.');
-        const endpoints = [
-            `https://api.generativeai.google/v1/models/${model}:predict`,
-            `https://generativeai.googleapis.com/v1/models/${model}:predict`,
-            `https://gemini.googleapis.com/v1/models/${model}:predict`,
-            `https://api.generativeai.google/v1beta2/models/${model}:predict`,
-            `https://generativeai.googleapis.com/v1beta2/models/${model}:predict`
-        ];
-        const params = useBearer ? '' : `?key=${encodeURIComponent(apiKey)}`;
-        const headers = {
-            'Content-Type': 'application/json'
-        };
-        if (useBearer) {
-            headers.Authorization = `Bearer ${apiKey}`;
-        }
-
-        const requestBody = JSON.stringify(body);
-        let response;
-        let responseText;
-        let attemptedUrl = '';
-        let lastError = null;
-
-        for (const endpoint of endpoints) {
-            attemptedUrl = endpoint + params;
-            try {
-                response = await fetch(attemptedUrl, {
-                    method: 'POST',
-                    headers,
-                    body: requestBody
-                });
-                responseText = await response.text();
-            } catch (err) {
-                lastError = err;
-                console.warn('Gemini fetch failed for endpoint:', attemptedUrl, err.message);
-                continue;
-            }
-
-            if (response.ok) {
-                break;
-            }
-
-            const bodyText = responseText?.trim() || '';
-            if (!bodyText.startsWith('<')) {
-                break;
-            }
-
-            console.warn('Gemini endpoint returned HTML/non-JSON; trying next endpoint:', response.status, attemptedUrl);
-        }
-
+        // 4. 刪除暫存圖片
         fs.unlink(imagePath, () => {});
 
-        if (!response) {
-            return res.status(500).json({
-                error: 'Gemini OCR failed',
-                details: lastError ? lastError.message : 'No response from Gemini endpoints',
-                url: attemptedUrl
-            });
-        }
-
-        let data;
-        try {
-            data = JSON.parse(responseText);
-        } catch (parseError) {
-            console.error('Gemini API returned non-JSON response:', response.status, attemptedUrl, responseText.slice(0, 1000));
-            return res.status(500).json({
-                error: 'Gemini OCR failed',
-                details: `Non-JSON response from Gemini API (status ${response.status})`,
-                url: attemptedUrl,
-                body: responseText.slice(0, 500)
-            });
-        }
-
-        if (!response.ok) {
-            const message = data.error?.message || JSON.stringify(data);
-            console.error('Gemini API failed:', message);
-            return res.status(500).json({ error: 'Gemini OCR failed', details: message });
-        }
-
-        const text = parseGeminiResponse(data).trim();
+        // 5. 取得辨識後的文字
+        const text = response.text;
         if (!text) {
-            return res.status(500).json({ error: 'Gemini OCR returned no text', details: JSON.stringify(data) });
+            return res.status(500).json({ error: 'Gemini OCR returned no text' });
         }
 
+        // 6. 回傳給前端
         res.json({ text });
+
     } catch (error) {
+        // 確保發生錯誤時，暫存圖片依然會被刪除，避免硬碟爆滿
         fs.unlink(imagePath, () => {});
-        console.error('Gemini OCR failed:', error);
-        return res.status(500).json({ error: 'Gemini OCR failed', details: error.message });
+        console.error('Gemini OCR 發生錯誤:', error);
+        return res.status(500).json({ 
+            error: 'Gemini OCR failed', 
+            details: error.message 
+        });
     }
 });
-
 app.use(express.static(path.join(__dirname, './')));
 
 const HOST = '0.0.0.0';
