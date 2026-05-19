@@ -30,13 +30,18 @@ def gemini_image_to_text(path, api_key, model=GEMINI_MODEL):
         }
     }
 
+    use_bearer = api_key.startswith('ya29.')
     url = f"https://gemini.googleapis.com/v1/models/{model}:predict"
     headers = {
-        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
+    params = None
+    if use_bearer:
+        headers["Authorization"] = f"Bearer {api_key}"
+    else:
+        params = {"key": api_key}
 
-    response = requests.post(url, json=body, headers=headers, timeout=30)
+    response = requests.post(url, json=body, headers=headers, params=params, timeout=30)
     response.raise_for_status()
     data = response.json()
 

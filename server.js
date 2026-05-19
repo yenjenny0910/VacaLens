@@ -239,12 +239,18 @@ app.post('/api/ocr', auth, upload.single('file'), async (req, res) => {
             }
         };
 
-        const response = await fetch(`https://gemini.googleapis.com/v1/models/${model}:predict`, {
+        const useBearer = apiKey.startsWith('ya29.');
+        const url = `https://gemini.googleapis.com/v1/models/${model}:predict${useBearer ? '' : '?key=' + encodeURIComponent(apiKey)}`;
+        const headers = {
+            'Content-Type': 'application/json'
+        };        
+        if (useBearer) {
+            headers.Authorization = `Bearer ${apiKey}`;
+        }
+
+        const response = await fetch(url, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            },
+            headers,
             body: JSON.stringify(body)
         });
 
