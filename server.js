@@ -248,8 +248,19 @@ app.post('/api/ocr', auth, upload.single('file'), async (req, res) => {
             body: JSON.stringify(body)
         });
 
-        const data = await response.json();
+        const responseText = await response.text();
         fs.unlink(imagePath, () => {});
+
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (parseError) {
+            console.error('Gemini API returned non-JSON response:', response.status, responseText.slice(0, 1000));
+            return res.status(500).json({
+                error: 'Gemini OCR failed',
+                details: `Non-JSON response from Gemini API (status ${response.status})`
+            });
+        }
 
         if (!response.ok) {
             const message = data.error?.message || JSON.stringify(data);
