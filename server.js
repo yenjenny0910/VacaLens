@@ -6,14 +6,11 @@ const sqlite3 = require('sqlite3');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { execFile } = require('child_process');
 const multer = require('multer');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-
-// 如果你想讓伺服器端直接呼叫 Gemini API，請在這裡填入你的 API Key：
-const GEMINI_API_KEY = 'AIzaSyBtRqWFSYtkgSFj4wVeu2NAPtB7NcjIDHI'; // <-- 在這裡填入你的 Gemini API Key
+const GEMINI_MODEL = 'gemini-2.5flash';
 
 app.use(cors({
     origin: true,
@@ -185,33 +182,91 @@ const uploadDir = path.join(__dirname, 'uploads');
 fs.mkdirSync(uploadDir, { recursive: true });
 const upload = multer({ dest: uploadDir });
 
+function parseGeminiResponse(data) {
+    if (!data || typeof data !== 'object') return '';
+
+    if (Array.isArray(data.predictions) && data.predictions.length > 0) {
+        const first = data.predictions[0];
+        if (typeof first === 'string') {
+            return first;
+        }
+        if (first && typeof first === 'object') {
+            if (Array.isArray(first.output) && first.output.length > 0) {
+                const item = first.output[0];
+                if (typeof item === 'string') return item;
+                if (item && typeof item === 'object') return item.content || item.text || '';
+            }
+            return first.content || first.text || '';
+        }
+    }
+
+    if (Array.isArray(data.output) && data.output.length > 0) {
+        const first = data.output[0];
+        if (typeof first === 'string') return first;
+        if (first && typeof first === 'object') return first.content || first.text || '';
+    }
+
+    return '';
+}
+
 app.post('/api/ocr', auth, upload.single('file'), async (req, res) => {
     if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const lang = req.body.lang || 'eng+chi_sim';
     const imagePath = req.file.path;
-    const pythonCmd = process.platform.startsWith('win') ? 'python' : 'python3';
-    const scriptPath = path.join(__dirname, 'ocr.py');
-    const args = [scriptPath, imagePath, '--lang', lang];
+        const apiKey = process.env.API_KEY;
 
-    if (GEMINI_API_KEY) {
-        args.push('--use-gemini', '--api-key', GEMINI_API_KEY);
+    if (!apiKey) {
+        fs.unlink(imagePath, () => {});
+        return res.status(500).json({ error: 'Gemini API key is not configured' });
     }
 
-    execFile(pythonCmd, args, { cwd: __dirname, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+    try {
+        const imageBytes = await fs.promises.readFile(imagePath);
+        const base64Image = imageBytes.toString('base64');
+        const body = {
+            instances: [
+                {
+                    image: { imageBytes: base64Image },
+                    input: 'Extract the text from this image and return only the recognized text.'
+                }
+            ],
+            parameters: {
+                temperature: 0.0,
+                maxOutputTokens: 1024
+            }
+        };
+
+        const response = await fetch(`https://gemini.googleapis.com/v1/models/${model}:predict`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body)
+        });
+
+        const data = await response.json();
         fs.unlink(imagePath, () => {});
-        if (error) {
-            console.error('OCR failed:', error);
-            if (stderr) console.error('OCR stderr:', stderr);
-            if (stdout) console.error('OCR stdout:', stdout);
-            const details = stderr?.trim() || stdout?.trim() || error.message;
-            return res.status(500).json({ error: 'OCR failed', details });
+
+        if (!response.ok) {
+            const message = data.error?.message || JSON.stringify(data);
+            console.error('Gemini API failed:', message);
+            return res.status(500).json({ error: 'Gemini OCR failed', details: message });
         }
 
-        res.json({ text: stdout });
-    });
+        const text = parseGeminiResponse(data).trim();
+        if (!text) {
+            return res.status(500).json({ error: 'Gemini OCR returned no text', details: JSON.stringify(data) });
+        }
+
+        res.json({ text });
+    } catch (error) {
+        fs.unlink(imagePath, () => {});
+        console.error('Gemini OCR failed:', error);
+        return res.status(500).json({ error: 'Gemini OCR failed', details: error.message });
+    }
 });
 
 app.use(express.static(path.join(__dirname, './')));
