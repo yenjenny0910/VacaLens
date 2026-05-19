@@ -5,7 +5,7 @@ import base64
 import json
 import requests
 
-GEMINI_MODEL = "gemini-2.5flash"
+GEMINI_MODEL = "gemini-2.5-flash"
 
 
 def gemini_image_to_text(path, api_key, model=GEMINI_MODEL):

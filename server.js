@@ -10,7 +10,7 @@ const multer = require('multer');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const GEMINI_MODEL = 'gemini-2.5flash';
+const GEMINI_MODEL = 'gemini-2.5-flash';
 
 app.use(cors({
     origin: true,
