@@ -241,7 +241,7 @@ app.post('/api/ocr', auth, upload.single('file'), async (req, res) => {
 
         const useBearer = apiKey.startsWith('ya29.');
         const baseUrl = `https://gemini.googleapis.com/v1/models/${model}:predict`;
-        const fallbackUrl = `https://api.generativeai.googleapis.com/v1/models/${model}:predict`;
+        const fallbackUrl = `https://api.generativeai.google/v1/models/${model}:predict`;
         const params = useBearer ? '' : `?key=${encodeURIComponent(apiKey)}`;
         const headers = {
             'Content-Type': 'application/json'
