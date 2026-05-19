@@ -254,8 +254,13 @@ app.post('/api/ocr', auth, upload.single('file'), async (req, res) => {
         };
 
         const useBearer = apiKey.startsWith('ya29.');
-        const baseUrl = `https://gemini.googleapis.com/v1/models/${model}:predict`;
-        const fallbackUrl = `https://generativeai.googleapis.com/v1/models/${model}:predict`;
+        const endpoints = [
+            `https://api.generativeai.google/v1/models/${model}:predict`,
+            `https://generativeai.googleapis.com/v1/models/${model}:predict`,
+            `https://gemini.googleapis.com/v1/models/${model}:predict`,
+            `https://api.generativeai.google/v1beta2/models/${model}:predict`,
+            `https://generativeai.googleapis.com/v1beta2/models/${model}:predict`
+        ];
         const params = useBearer ? '' : `?key=${encodeURIComponent(apiKey)}`;
         const headers = {
             'Content-Type': 'application/json'
@@ -265,26 +270,47 @@ app.post('/api/ocr', auth, upload.single('file'), async (req, res) => {
         }
 
         const requestBody = JSON.stringify(body);
-        const callGemini = async (endpoint) => {
-            return await fetch(endpoint + params, {
-                method: 'POST',
-                headers,
-                body: requestBody
-            });
-        };
+        let response;
+        let responseText;
+        let attemptedUrl = '';
+        let lastError = null;
 
-        let response = await callGemini(baseUrl);
-        let responseText = await response.text();
-        let attemptedUrl = baseUrl + params;
+        for (const endpoint of endpoints) {
+            attemptedUrl = endpoint + params;
+            try {
+                response = await fetch(attemptedUrl, {
+                    method: 'POST',
+                    headers,
+                    body: requestBody
+                });
+                responseText = await response.text();
+            } catch (err) {
+                lastError = err;
+                console.warn('Gemini fetch failed for endpoint:', attemptedUrl, err.message);
+                continue;
+            }
 
-        if ((response.status === 404 || response.status === 403 || response.status === 401) && responseText.trim().startsWith('<')) {
-            console.warn('Primary Gemini endpoint failed, retrying fallback URL:', response.status, attemptedUrl);
-            response = await callGemini(fallbackUrl);
-            responseText = await response.text();
-            attemptedUrl = fallbackUrl + params;
+            if (response.ok) {
+                break;
+            }
+
+            const bodyText = responseText?.trim() || '';
+            if (!bodyText.startsWith('<')) {
+                break;
+            }
+
+            console.warn('Gemini endpoint returned HTML/non-JSON; trying next endpoint:', response.status, attemptedUrl);
         }
 
         fs.unlink(imagePath, () => {});
+
+        if (!response) {
+            return res.status(500).json({
+                error: 'Gemini OCR failed',
+                details: lastError ? lastError.message : 'No response from Gemini endpoints',
+                url: attemptedUrl
+            });
+        }
 
         let data;
         try {
@@ -294,7 +320,8 @@ app.post('/api/ocr', auth, upload.single('file'), async (req, res) => {
             return res.status(500).json({
                 error: 'Gemini OCR failed',
                 details: `Non-JSON response from Gemini API (status ${response.status})`,
-                url: attemptedUrl
+                url: attemptedUrl,
+                body: responseText.slice(0, 500)
             });
         }
 
